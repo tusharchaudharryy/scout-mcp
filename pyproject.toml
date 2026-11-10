@@ -1,0 +1,30 @@
+[project]
+name = "scout-mcp"
+version = "0.1.0"
+description = "MCP server that gives AI agents private web search (SearXNG), safe page fetching and BM25 search over your own notes."
+readme = "README.md"
+authors = [
+    { name = "tusharchaudharryy", email = "chaudharytushar477@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "httpx2>=2.16",
+    "mcp[cli]>=2.3.0",
+    "pydantic>=2.11",
+]
+
+[project.scripts]
+scout-mcp = "scout_mcp:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

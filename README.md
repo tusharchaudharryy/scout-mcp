@@ -148,3 +148,7 @@ data/docs/    your notes
 
 Built with the official [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk), starting
 from the [Build an MCP server](https://modelcontextprotocol.io/docs/develop/build-server) guide.
+
+## License
+
+[MIT](LICENSE) (c) 2026 Tushar Chaudhary

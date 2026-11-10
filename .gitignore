@@ -12,3 +12,6 @@ wheels/
 # Tooling and local secrets
 .pytest_cache/
 .env
+
+# Research agent run traces
+runs/

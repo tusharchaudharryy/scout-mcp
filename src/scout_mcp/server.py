@@ -40,7 +40,7 @@ def create_server(
     """Build the server. `transport` and `resolver` exist so tests can run without a network."""
     settings = settings or Settings.from_env()
     store = DocStore(settings.docs_dir)
-    mcp = MCPServer("scout", instructions=INSTRUCTIONS, version="0.1.0")
+    mcp = MCPServer("scout", instructions=INSTRUCTIONS, version="0.1.0", log_level=settings.log_level)  # type: ignore[arg-type]
 
     def http_client() -> httpx2.AsyncClient:
         return httpx2.AsyncClient(
@@ -147,8 +147,8 @@ def create_server(
 
 def main() -> None:
     # stdio servers must never write to stdout (it carries the JSON-RPC messages), so log to stderr.
-    logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     settings = Settings.from_env()
+    logging.basicConfig(level=settings.log_level, stream=sys.stderr, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     log.info("docs folder: %s | SearXNG: %s", settings.docs_dir, settings.searxng_url)
     create_server(settings).run(transport="stdio")
 

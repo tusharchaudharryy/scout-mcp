@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -25,11 +26,14 @@ class Settings:
     allow_private_urls: bool = False
     # Sites such as Wikipedia reject anonymous bots: say who we are and where to find the project.
     user_agent: str = "scout-mcp/0.1 (+https://github.com/tusharchaudharryy/scout-mcp)"
+    log_level: str = "INFO"
 
     @classmethod
     def from_env(cls) -> Settings:
         d = cls()
+        level = os.environ.get("SCOUT_LOG_LEVEL", d.log_level).strip().upper()
         return cls(
+            log_level=level if level in LOG_LEVELS else d.log_level,
             searxng_url=os.environ.get("SEARXNG_URL", d.searxng_url).rstrip("/"),
             docs_dir=Path(os.environ.get("SCOUT_DOCS_DIR", str(d.docs_dir))).expanduser().resolve(),
             http_timeout=float(os.environ.get("SCOUT_HTTP_TIMEOUT", d.http_timeout)),

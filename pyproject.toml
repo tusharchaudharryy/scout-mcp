@@ -10,6 +10,7 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
+    "anyio>=4.5",
     "httpx2>=2.16",
     "mcp[cli]>=2.3.0",
     "pydantic>=2.11",
@@ -25,6 +26,9 @@ scout-mcp = "scout_mcp:main"
 [build-system]
 requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/scout_mcp", "src/scout_agent"]
 
 [dependency-groups]
 dev = [

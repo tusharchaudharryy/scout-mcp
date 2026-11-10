@@ -1,7 +1,7 @@
 import httpx2
 import pytest
 
-from scout_mcp.fetch import FetchError, check_url, fetch_page, html_to_text
+from scout_mcp.fetch import FetchError, check_url, fetch_page
 
 PUBLIC_IP = "93.184.215.14"
 
@@ -38,16 +38,6 @@ def test_other_schemes_and_credentials_are_blocked(url):
 def test_public_url_passes_and_private_can_be_allowed():
     check_url("https://example.com/page", allow_private=False, resolver=public_resolver)
     check_url("http://localhost:8080/", allow_private=True, resolver=public_resolver)
-
-
-def test_html_to_text_keeps_structure_and_drops_boilerplate():
-    title, text = html_to_text(
-        "<html><head><title>Weevil &amp; palms</title><style>p{}</style></head><body>"
-        "<nav>Home | About</nav><h1>Detection</h1><p>Acoustic <b>sensors</b> work.</p>"
-        "<ul><li>VOC</li><li>Thermal</li></ul><script>alert('x')</script><footer>(c) site</footer></body></html>"
-    )
-    assert title == "Weevil & palms"
-    assert text == "# Detection\n\nAcoustic sensors work.\n\n- VOC\n- Thermal"
 
 
 def client_for(routes: dict[str, httpx2.Response]) -> httpx2.AsyncClient:

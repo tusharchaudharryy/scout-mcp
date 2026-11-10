@@ -105,6 +105,13 @@ needs to start it.
   refuses loopback, private, link-local and reserved addresses, such as the cloud metadata address
   169.254.169.254. It caps download size and rejects non-text content. Limitation: it does not
   defend against DNS rebinding.
+- **Readable text.** The page is parsed into an element tree. If it marks a main area (`<main>`,
+  `role="main"` or a single `<article>`), only that area is used, so classes on the layout wrappers
+  around it cannot hide the content. Menus, sidebars, dropdowns, footers, hidden and screen-reader-only
+  text, scripts and forms are dropped. A class word only counts at the start or end of a class name
+  (`layout-sidebar` yes, `feature-main-menu-disabled` no). If the strict rules would remove almost
+  everything, gentler ones are used instead. Checked against Wikipedia, docs.python.org, GitHub,
+  hamel.dev and fao.org.
 - **Chunking.** Notes are split at blank lines and merged into chunks of up to about 1,200 characters.
   A paragraph is never split, and each chunk keeps its Markdown heading, which is also indexed.
 - **Ranking.** BM25 (k1 = 1.5, b = 0.75) with a small stopword list, implemented in `docs.py` with
@@ -118,7 +125,8 @@ needs to start it.
 src/scout_mcp/
   server.py   MCP server: tools, resource, prompt, entry point
   search.py   SearXNG client
-  fetch.py    URL safety checks, fetching, HTML-to-text
+  fetch.py    URL safety checks and fetching
+  html_text.py  HTML to readable text: main-content detection, menu and sidebar removal
   docs.py     chunking, BM25 index, note store
   config.py   settings from environment variables
 tests/        unit tests + end-to-end tests through the MCP protocol (in-memory client)

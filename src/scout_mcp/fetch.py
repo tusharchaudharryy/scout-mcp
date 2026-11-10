@@ -12,16 +12,15 @@ from __future__ import annotations
 
 import codecs
 import ipaddress
-import re
 import socket
 from collections.abc import Callable
-from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit
 
 import httpx2
 from pydantic import BaseModel
 
 from .errors import ResearchError
+from .html_text import html_to_text, tidy
 
 Resolver = Callable[[str], list[str]]
 
@@ -89,69 +88,6 @@ def check_url(url: str, *, allow_private: bool, resolver: Resolver = resolve_hos
             )
 
 
-class _TextExtractor(HTMLParser):
-    """HTML -> plain text with light Markdown structure (headings, list items, paragraphs)."""
-
-    SKIP = {"script", "style", "noscript", "svg", "template", "iframe", "nav", "footer", "aside", "form", "head"}
-    BLOCK = {"p", "div", "section", "article", "main", "header", "blockquote", "pre", "table", "tr", "ul", "ol", "dl", "dt", "dd", "figure", "figcaption"}
-
-    def __init__(self) -> None:
-        super().__init__(convert_charrefs=True)
-        self.parts: list[str] = []
-        self.title_parts: list[str] = []
-        self._skip = 0
-        self._in_title = False
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag == "title":
-            self._in_title = True
-        elif tag in self.SKIP:
-            self._skip += 1
-        elif self._skip:
-            return
-        elif tag in self.BLOCK:
-            self.parts.append("\n\n")
-        elif re.fullmatch(r"h[1-6]", tag):
-            self.parts.append("\n\n" + "#" * int(tag[1]) + " ")
-        elif tag == "li":
-            self.parts.append("\n- ")
-        elif tag in ("br", "hr"):
-            self.parts.append("\n")
-        elif tag in ("td", "th"):
-            self.parts.append(" | ")
-
-    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if not self._skip and tag in ("br", "hr"):
-            self.parts.append("\n")
-
-    def handle_endtag(self, tag: str) -> None:
-        if tag == "title":
-            self._in_title = False
-        elif tag in self.SKIP:
-            self._skip = max(0, self._skip - 1)
-        elif not self._skip and (tag in self.BLOCK or re.fullmatch(r"h[1-6]", tag)):
-            self.parts.append("\n\n")
-
-    def handle_data(self, data: str) -> None:
-        if self._in_title:
-            self.title_parts.append(data)
-        elif not self._skip:
-            self.parts.append(data)
-
-
-def _tidy(text: str) -> str:
-    lines = [re.sub(r"[ \t\r\f\v]+", " ", line).strip() for line in text.split("\n")]
-    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
-
-
-def html_to_text(html: str) -> tuple[str, str]:
-    """Return (title, text) for an HTML document."""
-    parser = _TextExtractor()
-    parser.feed(html)
-    parser.close()
-    return _tidy(" ".join(parser.title_parts)), _tidy("".join(parser.parts))
-
-
 async def _read_capped(resp: httpx2.Response, max_bytes: int) -> tuple[bytes, bool]:
     chunks: list[bytes] = []
     size = 0
@@ -211,7 +147,7 @@ async def fetch_page(
         if content_type in _HTML_TYPES or (not content_type and "<html" in raw[:2000].lower()):
             title, text = html_to_text(raw)
         else:
-            title, text = "", _tidy(raw)
+            title, text = "", tidy(raw)
         return FetchedPage(
             url=url,
             final_url=current,

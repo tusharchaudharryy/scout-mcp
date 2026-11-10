@@ -4,7 +4,10 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 
-An [MCP](https://modelcontextprotocol.io) server that gives AI agents three research abilities:
+Two parts in one repository:
+
+**`scout-mcp`**, an [MCP](https://modelcontextprotocol.io) server that gives AI agents three research
+abilities:
 
 - **Private web search** through a self-hosted [SearXNG](https://docs.searxng.org) instance, with no
   search API key and no tracking.
@@ -13,9 +16,10 @@ An [MCP](https://modelcontextprotocol.io) server that gives AI agents three rese
 - **Search over your own notes**: BM25 ranking over paragraph-bound Markdown chunks, so the model sees
   whole paragraphs with their section heading.
 
-It works with any MCP client, such as the MCP Inspector, VS Code or Cursor. It is the first part of a
-larger project: a research agent built on these tools, plus an evaluation suite for it (see
-[Roadmap](#roadmap)).
+**`scout`**, a research agent that uses those tools to answer questions with citations that are checked
+against what it actually read (see [Research agent](#research-agent)).
+
+The server works with any MCP client, such as the MCP Inspector, VS Code or Cursor.
 
 ## Tools, resource and prompt
 
@@ -88,7 +92,70 @@ not found, use its full path (`which uv`, or `where uv` on Windows).
 The server speaks MCP over stdio, so `uv run scout-mcp` (or `python -m scout_mcp`) is all a client
 needs to start it.
 
+## Research agent
+
+`scout ask` answers a question with cited sources. It starts scout-mcp as a subprocess and talks to it
+over MCP, like any other client.
+
+```
+question -> planner (LLM) -> sub-questions
+         -> workers, one per sub-question, in parallel: LLM + scout-mcp tools in a loop
+         -> writer (LLM) -> answer with [S1]-style labels
+         -> citation check (code) -> answer + sources list
+```
+
+- **Only what was read can be cited.** Every page the agent fetches and every note passage it reads
+  gets a label such as `[S3]`. Search snippets get no label: the agent has to fetch a page before
+  citing it.
+- **Citations are checked by code, not by the model.** Labels that match nothing are flagged, the share
+  of claims (sentences and bullets) that carry a label is measured, and the sources list is built from
+  what was read, so the model cannot invent a URL.
+- **Every run leaves a trace.** Each LLM call, tool call, result size and token count is appended to a
+  JSON Lines file in `runs/`, for debugging and for the evaluation suite.
+- **Budgets.** Sub-questions (default 3), tool rounds per worker (6), page text per tool call (5,000
+  characters) and parallel workers (2) are capped. A worker that runs out of steps must answer from
+  what it has read. Rate limits and server errors are retried, honouring `Retry-After`.
+- **Failures stay contained.** A worker whose LLM calls fail is reported and the others carry on; bad
+  tool arguments and tool errors go back to the model so it can correct itself.
+
+### Choose an LLM
+
+Any provider with an OpenAI-compatible chat-completions API and tool calling works. Set three variables:
+
+| Provider | `SCOUT_LLM_BASE_URL` | `SCOUT_LLM_MODEL` (example) | `SCOUT_LLM_API_KEY` |
+|---|---|---|---|
+| Groq (free tier) | `https://api.groq.com/openai/v1` | `openai/gpt-oss-120b` | from console.groq.com |
+| Gemini (free tier) | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-3.8-flash` | from aistudio.google.com |
+| OpenAI | `https://api.openai.com/v1` (the default) | a current chat model with tool calling | from platform.openai.com |
+| Ollama (local) | `http://localhost:11434/v1` | a local model that supports tools | not needed |
+
+Model names change often: pick a current one from the provider's model list that supports tool calling.
+
+### Ask a question
+
+```powershell
+$env:SCOUT_LLM_BASE_URL = "https://api.groq.com/openai/v1"   # bash: export SCOUT_LLM_BASE_URL=...
+$env:SCOUT_LLM_MODEL = "openai/gpt-oss-120b"
+$env:SCOUT_LLM_API_KEY = "<your key>"
+uv run scout ask "How do acoustic sensors detect red palm weevil?"
+```
+
+The answer, with its sources list, goes to stdout. A summary goes to stderr; this one is from a test
+run with a scripted model:
+
+```
+-- 2 sub-questions | 2 sources read, 2 cited | citation coverage 100% (3/3 claims) | tokens 600 in / 120 out | 0.2 s
+-- trace: runs/20261111-000650-what-is-mcp-and-how-does-stdio-work.jsonl
+```
+
+Options: `--max-subquestions`, `--max-steps`, `--max-page-chars`, `--concurrency`, `--runs-dir` and
+`--json` (the whole result as JSON). Without SearXNG the agent still works from your notes; web search
+then returns an error that the agent sees and works around. The API key is never passed to the MCP
+server subprocess and never written to traces.
+
 ## Configuration
+
+Server:
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -98,6 +165,15 @@ needs to start it.
 | `SCOUT_FETCH_MAX_BYTES` | `2000000` | Maximum bytes downloaded per page |
 | `SCOUT_ALLOW_PRIVATE_URLS` | `false` | Allow `fetch_page` to reach localhost and private networks |
 | `SCOUT_USER_AGENT` | `scout-mcp/0.1 (+https://github.com/tusharchaudharryy/scout-mcp)` | User-Agent sent with fetches and searches. Keep a URL or contact in it: sites such as Wikipedia block anonymous bots |
+| `SCOUT_LOG_LEVEL` | `INFO` (`WARNING` when started by the agent) | Server log level; logs go to stderr |
+
+Agent (besides the three `SCOUT_LLM_*` variables above):
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `SCOUT_LLM_TIMEOUT` | `60` | Seconds before an LLM call gives up |
+| `SCOUT_LLM_MAX_RETRIES` | `3` | Retries for rate limits (HTTP 429), server errors and timeouts |
+| `SCOUT_LLM_TEMPERATURE` | `0.2` | Sampling temperature |
 
 ## Design notes
 
@@ -133,20 +209,27 @@ src/scout_mcp/
   html_text.py  HTML to readable text: main-content detection, menu and sidebar removal
   docs.py     chunking, BM25 index, note store
   config.py   settings from environment variables
-tests/        unit tests + end-to-end tests through the MCP protocol (in-memory client)
+src/scout_agent/
+  cli.py          `scout ask` command
+  orchestrator.py planner, parallel workers, writer
+  worker.py       tool loop for one sub-question
+  toolbox.py      MCP client: connects to scout-mcp, converts tool schemas
+  llm.py          OpenAI-compatible chat client with tool calling and retries
+  sources.py      labels for everything a run has read
+  citations.py    citation check and sources list
+  trace.py        JSON Lines trace of a run
+tests/        unit tests, end-to-end tests through the MCP protocol, agent tests with a scripted LLM
 searxng/      SearXNG settings used by docker-compose.yml
 data/docs/    your notes
 ```
 
 ## Roadmap
 
-1. **Research agent.** An orchestrator that plans sub-questions, sends worker calls through these
-   tools and merges the findings with citations.
-2. **Evaluation suite.** A fixed set of test questions, automatic checks (every claim cited, no
-   invented URLs), trace review, and an LLM judge measured against human labels, following Hamel
-   Husain's [Your AI Product Needs Evals](https://hamel.dev/blog/posts/evals/).
-3. **Learning from feedback.** Store the user's corrections and feed them back into later runs.
-4. **Better retrieval.** Hybrid search (BM25 + embeddings with rank fusion), and PDF support.
+1. **Evaluation suite.** A fixed set of test questions run through `scout ask`, scored from the run
+   traces: citation coverage, invented labels, cost and latency, plus an LLM judge measured against
+   human labels, following Hamel Husain's [Your AI Product Needs Evals](https://hamel.dev/blog/posts/evals/).
+2. **Learning from feedback.** Store the user's corrections and feed them back into later runs.
+3. **Better retrieval.** Hybrid search (BM25 + embeddings with rank fusion), and PDF support.
 
 ## Credits
 

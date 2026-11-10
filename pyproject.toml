@@ -1,7 +1,7 @@
 [project]
 name = "scout-mcp"
 version = "0.1.0"
-description = "MCP server that gives AI agents private web search (SearXNG), safe page fetching and BM25 search over your own notes."
+description = "MCP server for private web search (SearXNG), safe page fetching and BM25 notes search, plus a research agent that answers with checked citations."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]

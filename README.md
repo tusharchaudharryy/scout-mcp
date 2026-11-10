@@ -93,7 +93,7 @@ needs to start it.
 | `SCOUT_HTTP_TIMEOUT` | `15` | Seconds before a search or fetch gives up |
 | `SCOUT_FETCH_MAX_BYTES` | `2000000` | Maximum bytes downloaded per page |
 | `SCOUT_ALLOW_PRIVATE_URLS` | `false` | Allow `fetch_page` to reach localhost and private networks |
-| `SCOUT_USER_AGENT` | `scout-mcp/0.1` | User-Agent sent with fetches and searches |
+| `SCOUT_USER_AGENT` | `scout-mcp/0.1 (+https://github.com/tusharchaudharryy/scout-mcp)` | User-Agent sent with fetches and searches. Keep a URL or contact in it: sites such as Wikipedia block anonymous bots |
 
 ## Design notes
 

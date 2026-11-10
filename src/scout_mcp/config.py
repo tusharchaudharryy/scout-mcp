@@ -23,7 +23,8 @@ class Settings:
     http_timeout: float = 15.0
     fetch_max_bytes: int = 2_000_000
     allow_private_urls: bool = False
-    user_agent: str = "scout-mcp/0.1"
+    # Sites such as Wikipedia reject anonymous bots: say who we are and where to find the project.
+    user_agent: str = "scout-mcp/0.1 (+https://github.com/tusharchaudharryy/scout-mcp)"
 
     @classmethod
     def from_env(cls) -> Settings:

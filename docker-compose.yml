@@ -1,0 +1,14 @@
+# Private web search for the web_search tool.
+# Start: docker compose up -d     Check: http://localhost:8080/search?q=test&format=json
+services:
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: scout-searxng
+    ports:
+      - "127.0.0.1:8080:8080" # only reachable from this machine
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-change-me-to-a-long-random-string}
+    restart: unless-stopped

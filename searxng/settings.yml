@@ -1,0 +1,13 @@
+# SearXNG settings for scout-mcp. Everything not set here uses SearXNG's defaults.
+use_default_settings: true
+
+server:
+  # The secret comes from the SEARXNG_SECRET environment variable (see docker-compose.yml).
+  limiter: false # single local user; the limiter would need a Valkey/Redis service
+  image_proxy: false
+
+search:
+  safe_search: 1
+  formats:
+    - html
+    - json # required: scout-mcp calls /search?format=json
